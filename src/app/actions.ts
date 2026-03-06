@@ -161,6 +161,8 @@ export async function confirmDocumentUpload(documentId: string, mimeType: string
     return { error: e instanceof Error ? e.message : 'Errore di conferma.' };
   }
 }
+
+export async function updateDocumentStatus(
   documentId: string,
   status: 'approved' | 'needs_review'
 ) {
