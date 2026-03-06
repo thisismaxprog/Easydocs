@@ -41,60 +41,126 @@ export async function createFirm(formData: FormData) {
 }
 
 export async function uploadDocument(formData: FormData) {
-  const supabase = await createClient();
-  const firmId = await requireFirm();
-  const clientId = (formData.get('client_id') as string) || null;
-  const file = formData.get('file') as File;
-  if (!file) return { error: 'File richiesto' };
+  try {
+    const supabase = await createClient();
+    const firmId = await requireFirm();
+    const clientId = (formData.get('client_id') as string) || null;
+    const file = formData.get('file') as File;
+    if (!file) return { error: 'File richiesto' };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: 'Non autenticato' };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Non autenticato' };
 
-  const ext = file.name.split('.').pop() || 'bin';
-  const docId = crypto.randomUUID();
-  const storagePath = `firm/${firmId}/client/${clientId || 'none'}/${docId}-${file.name}`;
+    const docId = crypto.randomUUID();
+    const storagePath = `firm/${firmId}/client/${clientId || 'none'}/${docId}-${file.name}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from('documents')
-    .upload(storagePath, file, { upsert: false });
+    const admin = createServiceRoleClient();
 
-  if (uploadError) return { error: uploadError.message };
+    const { error: uploadError } = await admin.storage
+      .from('documents')
+      .upload(storagePath, file, { upsert: false });
 
-  const { error: insertError } = await supabase.from('documents').insert({
-    firm_id: firmId,
-    client_id: clientId || null,
-    filename: file.name,
-    storage_path: storagePath,
-    mime_type: file.type,
-    status: 'uploaded',
-  });
+    if (uploadError) return { error: uploadError.message };
 
-  if (insertError) return { error: insertError.message };
+    const { error: insertError } = await admin.from('documents').insert({
+      firm_id: firmId,
+      client_id: clientId || null,
+      filename: file.name,
+      storage_path: storagePath,
+      mime_type: file.type,
+      status: 'uploaded',
+    });
 
-  const { data: doc } = await supabase
-    .from('documents')
-    .select('id')
-    .eq('storage_path', storagePath)
-    .single();
+    if (insertError) return { error: insertError.message };
 
-  if (doc) {
-    await supabase.from('audit_logs').insert({
+    const { data: doc } = await admin
+      .from('documents')
+      .select('id')
+      .eq('storage_path', storagePath)
+      .single();
+
+    if (doc) {
+      await admin.from('audit_logs').insert({
+        firm_id: firmId,
+        user_id: user.id,
+        action: 'document.uploaded',
+        entity_type: 'document',
+        entity_id: doc.id,
+        meta: { filename: file.name },
+      });
+      processDocument(doc.id).catch(console.error);
+    }
+
+    revalidatePath('/documents');
+    revalidatePath('/overview');
+    return { success: true };
+  } catch (e) {
+    console.error('uploadDocument error:', e);
+    return { error: e instanceof Error ? e.message : 'Errore durante il caricamento. Riprova.' };
+  }
+}
+
+/** Prepara l'upload: crea il record e restituisce path per upload diretto browser → Storage (evita timeout server). */
+export async function prepareDocumentUpload(clientId: string | null, filename: string) {
+  try {
+    const supabase = await createClient();
+    const firmId = await requireFirm();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Non autenticato' };
+
+    const docId = crypto.randomUUID();
+    const storagePath = `firm/${firmId}/client/${clientId || 'none'}/${docId}-${filename}`;
+
+    const admin = createServiceRoleClient();
+    const { error: insertError } = await admin.from('documents').insert({
+      firm_id: firmId,
+      client_id: clientId || null,
+      filename,
+      storage_path: storagePath,
+      mime_type: null,
+      status: 'uploaded',
+    });
+
+    if (insertError) return { error: insertError.message };
+
+    const { data: doc } = await admin
+      .from('documents')
+      .select('id')
+      .eq('storage_path', storagePath)
+      .single();
+
+    if (!doc) return { error: 'Record documento non creato' };
+
+    await admin.from('audit_logs').insert({
       firm_id: firmId,
       user_id: user.id,
       action: 'document.uploaded',
       entity_type: 'document',
       entity_id: doc.id,
-      meta: { filename: file.name },
+      meta: { filename },
     });
-    processDocument(doc.id).catch(console.error);
-  }
 
-  revalidatePath('/documents');
-  revalidatePath('/overview');
-  return { success: true };
+    return { documentId: doc.id, storagePath };
+  } catch (e) {
+    console.error('prepareDocumentUpload error:', e);
+    return { error: e instanceof Error ? e.message : 'Errore di preparazione.' };
+  }
 }
 
-export async function updateDocumentStatus(
+/** Dopo upload da browser a Storage: aggiorna mime_type e avvia estrazione AI. */
+export async function confirmDocumentUpload(documentId: string, mimeType: string) {
+  try {
+    const admin = createServiceRoleClient();
+    await admin.from('documents').update({ mime_type: mimeType }).eq('id', documentId);
+    processDocument(documentId).catch(console.error);
+    revalidatePath('/documents');
+    revalidatePath('/overview');
+    return { success: true };
+  } catch (e) {
+    console.error('confirmDocumentUpload error:', e);
+    return { error: e instanceof Error ? e.message : 'Errore di conferma.' };
+  }
+}
   documentId: string,
   status: 'approved' | 'needs_review'
 ) {
@@ -165,11 +231,11 @@ export async function updateDocumentFields(
 
 export async function addClient(formData: FormData) {
   const firmId = await requireFirm();
-  const supabase = await createClient();
   const name = (formData.get('name') as string)?.trim();
   if (!name) return { error: 'Nome cliente richiesto' };
 
-  const { error } = await supabase.from('clients').insert({
+  const admin = createServiceRoleClient();
+  const { error } = await admin.from('clients').insert({
     firm_id: firmId,
     name,
     vat_number: (formData.get('vat_number') as string)?.trim() || null,

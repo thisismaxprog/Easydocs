@@ -15,7 +15,7 @@ export default async function OverviewPage() {
   const [docsResult, logsResult, clientsCount, docsCount] = await Promise.all([
     supabase
       .from('documents')
-      .select('id, filename, status, created_at, clients(name)')
+      .select('id, filename, status, created_at, client_id')
       .eq('firm_id', firmId)
       .order('created_at', { ascending: false })
       .limit(8),
@@ -138,7 +138,7 @@ export default async function OverviewPage() {
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{doc.filename}</p>
                         <p className="text-xs text-muted-foreground">
-                          {(doc.clients as { name?: string } | null)?.name ?? 'Senza cliente'} · {formatDistanceToNow(doc.created_at)}
+                          {doc.client_id ? 'Cliente associato' : 'Senza cliente'} · {formatDistanceToNow(doc.created_at)}
                         </p>
                       </div>
                     </div>

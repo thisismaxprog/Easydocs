@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { uploadDocument } from '@/app/actions';
+import { prepareDocumentUpload, confirmDocumentUpload } from '@/app/actions';
 import { useAppToast } from '@/hooks/use-app-toast';
 
 type Client = { id: string; name: string };
@@ -39,6 +39,7 @@ export function UploadDocumentDialog({
   const [clientId, setClientId] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
+  const uploadTimedOut = useRef(false);
   const { success, error } = useAppToast();
   const router = useRouter();
   const supabase = createClient();
@@ -57,21 +58,62 @@ export function UploadDocumentDialog({
     e.preventDefault();
     if (!file) return;
     setLoading(true);
-    const formData = new FormData();
-    formData.set('file', file);
-    if (clientId) formData.set('client_id', clientId);
-    const result = await uploadDocument(formData);
-    setLoading(false);
-    if (result?.error) {
-      error('Errore', result.error);
-      return;
+    uploadTimedOut.current = false;
+
+    const timeoutMs = 30000;
+    const timeoutId = setTimeout(() => {
+      uploadTimedOut.current = true;
+      setLoading(false);
+      error(
+        'Caricamento lento',
+        'L’upload potrebbe essere ancora in corso. Aggiorna la pagina Documenti tra qualche secondo.'
+      );
+    }, timeoutMs);
+
+    try {
+      const prep = await prepareDocumentUpload(clientId || null, file.name);
+      if (uploadTimedOut.current) return;
+      if (prep?.error) {
+        clearTimeout(timeoutId);
+        setLoading(false);
+        error('Errore', prep.error);
+        return;
+      }
+      if (!('storagePath' in prep) || !('documentId' in prep)) {
+        clearTimeout(timeoutId);
+        setLoading(false);
+        error('Errore', 'Risposta server non valida');
+        return;
+      }
+
+      const { error: uploadErr } = await supabase.storage
+        .from('documents')
+        .upload(prep.storagePath, file, { upsert: false });
+
+      clearTimeout(timeoutId);
+      setLoading(false);
+      if (uploadTimedOut.current) return;
+      if (uploadErr) {
+        error('Errore upload', uploadErr.message);
+        return;
+      }
+
+      const confirm = await confirmDocumentUpload(prep.documentId, file.type || '');
+      if (confirm?.error) {
+        error('Documento salvato ma elaborazione in ritardo', confirm.error);
+      } else {
+        success('Documento caricato', 'L’elaborazione è stata avviata.');
+      }
+      setFile(null);
+      setClientId('');
+      onOpenChange(false);
+      onSuccess?.();
+      router.refresh();
+    } catch (err) {
+      clearTimeout(timeoutId);
+      setLoading(false);
+      if (!uploadTimedOut.current) error('Errore', err instanceof Error ? err.message : 'Caricamento fallito.');
     }
-    success('Documento caricato', 'L’elaborazione è stata avviata.');
-    setFile(null);
-    setClientId('');
-    onOpenChange(false);
-    onSuccess?.();
-    router.refresh();
   }
 
   return (
