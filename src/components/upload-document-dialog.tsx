@@ -85,10 +85,12 @@ export function UploadDocumentDialog({
         error('Errore', 'Risposta server non valida');
         return;
       }
+      const storagePath = prep.storagePath as string;
+      const documentId = prep.documentId as string;
 
       const { error: uploadErr } = await supabase.storage
         .from('documents')
-        .upload(prep.storagePath, file, { upsert: false });
+        .upload(storagePath, file, { upsert: false });
 
       clearTimeout(timeoutId);
       setLoading(false);
@@ -98,7 +100,7 @@ export function UploadDocumentDialog({
         return;
       }
 
-      const confirm = await confirmDocumentUpload(prep.documentId, file.type || '');
+      const confirm = await confirmDocumentUpload(documentId, file.type || '');
       if (confirm?.error) {
         error('Documento salvato ma elaborazione in ritardo', confirm.error);
       } else {
