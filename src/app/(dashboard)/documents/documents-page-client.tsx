@@ -68,6 +68,11 @@ export function DocumentsPageClient({
     });
   }, [documents, search, statusFilter, clientFilter]);
 
+  const totalAmount = useMemo(
+    () => filtered.reduce((sum, d) => sum + (d.total != null ? Number(d.total) : 0), 0),
+    [filtered]
+  );
+
   const statusOptions = [
     'all',
     'uploaded',
@@ -90,7 +95,7 @@ export function DocumentsPageClient({
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setExportOpen(true)}>
             <Download className="mr-2 h-4 w-4" />
-            Export CSV
+            Export
           </Button>
           <Button onClick={() => setUploadOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
@@ -148,6 +153,9 @@ export function DocumentsPageClient({
                 <Upload className="mr-2 h-4 w-4" />
                 Carica documento
               </Button>
+              <div className="mt-4 text-sm font-medium text-muted-foreground">
+                Totale documenti: € 0,00
+              </div>
             </div>
           ) : (
             <div className="rounded-md border border-border overflow-x-auto">
@@ -183,6 +191,9 @@ export function DocumentsPageClient({
                   ))}
                 </TableBody>
               </Table>
+              <div className="flex justify-end border-t border-border bg-muted/30 px-4 py-3 text-sm font-medium">
+                Totale documenti: € {totalAmount.toFixed(2)}
+              </div>
             </div>
           )}
         </CardContent>

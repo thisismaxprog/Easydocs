@@ -30,10 +30,12 @@ export default async function ClientDetailPage({
 
   const { data: documents } = await supabase
     .from('documents')
-    .select('id, filename, status, source_type, created_at')
+    .select('id, filename, status, source_type, created_at, total')
     .eq('client_id', id)
     .order('created_at', { ascending: false })
     .limit(20);
+
+  const documentsTotal = (documents ?? []).reduce((sum, d) => sum + (d.total != null ? Number(d.total) : 0), 0);
 
   const displayName = client.company_name || client.name || 'Cliente';
   const contactEmail = client.contact_email || client.email;
@@ -129,30 +131,45 @@ export default async function ClientDetailPage({
               <p className="text-xs text-muted-foreground">
                 I documenti caricati tramite il link di caricamento appariranno qui.
               </p>
+              <p className="mt-4 text-sm font-medium text-muted-foreground">
+                Totale documenti: € 0,00
+              </p>
             </div>
           ) : (
-            <ul className="space-y-2">
-              {documents.map((doc) => (
-                <li key={doc.id}>
-                  <Link
-                    href={`/documents/${doc.id}`}
-                    className="flex items-center justify-between rounded-md border border-border p-3 transition-colors hover:bg-muted/50"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{doc.filename}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(doc.created_at)} · {doc.status}
-                          {doc.source_type === 'upload_link' && ' · Link cliente'}
-                        </p>
+            <>
+              <ul className="space-y-2">
+                {documents.map((doc) => (
+                  <li key={doc.id}>
+                    <Link
+                      href={`/documents/${doc.id}`}
+                      className="flex items-center justify-between rounded-md border border-border p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{doc.filename}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(doc.created_at)} · {doc.status}
+                            {doc.source_type === 'upload_link' && ' · Link cliente'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <Badge variant="secondary">{doc.status}</Badge>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+                      <div className="flex items-center gap-2">
+                        {doc.total != null && (
+                          <span className="text-sm tabular-nums text-muted-foreground">
+                            € {Number(doc.total).toFixed(2)}
+                          </span>
+                        )}
+                        <Badge variant="secondary">{doc.status}</Badge>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-3 flex justify-end border-t border-border pt-3 text-sm font-medium text-muted-foreground">
+                Totale documenti: € {documentsTotal.toFixed(2)}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

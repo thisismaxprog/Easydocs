@@ -42,11 +42,12 @@ export function ExportCsvDialog({
   const { success, error } = useAppToast();
   const router = useRouter();
 
-  async function handleExport() {
+  async function handleExport(format: 'xlsx' | 'csv') {
     setLoading(true);
     try {
       const params = new URLSearchParams({ month, client_id: clientId });
-      const res = await fetch(`/api/export-csv?${params}`);
+      const endpoint = format === 'xlsx' ? `/api/export-excel?${params}` : `/api/export-csv?${params}`;
+      const res = await fetch(endpoint);
       if (!res.ok) {
         const t = await res.text();
         throw new Error(t || res.statusText);
@@ -55,10 +56,11 @@ export function ExportCsvDialog({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `export-${month}${clientId !== 'all' ? `-${clientId}` : ''}.csv`;
+      const ext = format === 'xlsx' ? 'xlsx' : 'csv';
+      a.download = `export-${month}${clientId !== 'all' ? `-${clientId}` : ''}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
-      success('Export completato', 'Il file CSV è stato scaricato.');
+      success('Export completato', format === 'xlsx' ? 'Il file Excel è stato scaricato.' : 'Il file CSV è stato scaricato.');
       onOpenChange(false);
     } catch (e) {
       error('Errore export', e instanceof Error ? e.message : 'Export fallito');
@@ -71,9 +73,9 @@ export function ExportCsvDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Export CSV</DialogTitle>
+          <DialogTitle>Export</DialogTitle>
           <DialogDescription>
-            Esporta i documenti approvati per un mese (studio intero o singolo cliente).
+            Esporta i documenti approvati per un mese (studio intero o singolo cliente) in Excel o CSV.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -104,8 +106,11 @@ export function ExportCsvDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Annulla
           </Button>
-          <Button onClick={handleExport} disabled={loading}>
-            {loading ? 'Export…' : 'Scarica CSV'}
+          <Button onClick={() => handleExport('xlsx')} disabled={loading}>
+            {loading ? 'Export…' : 'Scarica Excel'}
+          </Button>
+          <Button type="button" variant="secondary" onClick={() => handleExport('csv')} disabled={loading}>
+            Scarica CSV
           </Button>
         </DialogFooter>
       </DialogContent>
