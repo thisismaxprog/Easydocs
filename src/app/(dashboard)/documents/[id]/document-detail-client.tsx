@@ -23,8 +23,6 @@ import {
 import { DOC_TYPE_OPTIONS, getDocTypeLabel } from '@/lib/doc-type-labels';
 import { updateDocumentFields, updateDocumentStatus } from '@/app/actions';
 import { useAppToast } from '@/hooks/use-app-toast';
-import type { ExtractionJson } from '@/lib/types';
-
 const formSchema = z.object({
   doc_type: z.string().optional(),
   doc_date: z.string().optional(),
@@ -46,7 +44,11 @@ type Doc = {
   clients: { name?: string } | null;
 };
 
-type Extraction = { extracted_json: ExtractionJson; confidence: number | null; issues: string[] | null };
+type Extraction = {
+  extracted_json: Record<string, unknown>;
+  confidence: number | null;
+  issues: string[] | null;
+};
 type AuditLog = { id: string; action: string; created_at: string };
 
 export function DocumentDetailClient({
@@ -65,11 +67,16 @@ export function DocumentDetailClient({
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
 
+  const json = ext?.extracted_json && typeof ext.extracted_json === 'object' ? ext.extracted_json : null;
+  const safeStr = (v: unknown) => (v != null && typeof v === 'string' ? v : v != null ? String(v) : '');
+  const safeNum = (v: unknown) => (typeof v === 'number' && !Number.isNaN(v) ? v : typeof v === 'string' ? Number(v) : null);
+  const totalFromJson = safeNum(json?.total_amount);
+
   const defaultValues: FormValues = {
-    doc_type: doc.doc_type ?? ext?.extracted_json?.doc_type ?? '',
-    doc_date: doc.doc_date ?? ext?.extracted_json?.doc_date ?? '',
-    doc_number: doc.doc_number ?? ext?.extracted_json?.doc_number ?? '',
-    total: doc.total != null ? String(doc.total) : (ext?.extracted_json?.total_amount != null ? String(ext.extracted_json.total_amount) : ''),
+    doc_type: doc.doc_type ?? safeStr(json?.doc_type) ?? '',
+    doc_date: doc.doc_date ?? safeStr(json?.doc_date) ?? '',
+    doc_number: doc.doc_number ?? safeStr(json?.doc_number) ?? '',
+    total: doc.total != null ? String(doc.total) : (totalFromJson != null ? String(totalFromJson) : ''),
   };
 
   const form = useForm<FormValues>({
@@ -198,7 +205,9 @@ export function DocumentDetailClient({
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Seleziona tipo">
-                              {field.value ? getDocTypeLabel(field.value) : null}
+                              {field.value != null && field.value !== ''
+                                ? getDocTypeLabel(String(field.value))
+                                : null}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent>
