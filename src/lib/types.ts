@@ -9,30 +9,51 @@ export type DocStatus =
 export interface Firm {
   id: string;
   name: string;
+  vat_number?: string | null;
   created_at: string;
+  updated_at?: string;
 }
+
+export type FirmMemberRole = 'owner' | 'staff' | 'admin' | 'collaborator';
 
 export interface FirmMember {
   id: string;
   firm_id: string;
   user_id: string;
-  role: 'owner' | 'staff';
+  role: FirmMemberRole;
   created_at: string;
 }
+
+export type ClientInvitationStatus = 'not_invited' | 'invited' | 'accepted' | 'expired';
 
 export interface Client {
   id: string;
   firm_id: string;
   name: string;
+  company_name: string | null;
   vat_number: string | null;
+  tax_code: string | null;
+  internal_code: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
   email: string | null;
+  phone: string | null;
+  notes: string | null;
+  invitation_status: ClientInvitationStatus;
+  upload_token: string | null;
   created_at: string;
+  updated_at?: string;
 }
+
+export type DocumentSourceType = 'client_portal' | 'upload_link' | 'firm_upload' | 'email' | 'unknown';
+export type DocumentClassificationStatus = 'assigned' | 'suggested' | 'unmatched';
 
 export interface Document {
   id: string;
   firm_id: string;
   client_id: string | null;
+  uploaded_by_user_id?: string | null;
+  source_type?: DocumentSourceType;
   filename: string;
   storage_path: string;
   mime_type: string | null;
@@ -41,10 +62,15 @@ export interface Document {
   doc_date: string | null;
   doc_number: string | null;
   total: number | null;
+  classification_status?: DocumentClassificationStatus;
+  match_confidence?: number | null;
+  match_reason?: string | null;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
   clients?: Client | null;
 }
+
 
 export interface ExtractionJson {
   doc_type: 'invoice' | 'receipt' | 'bank' | 'utility' | 'other' | null;

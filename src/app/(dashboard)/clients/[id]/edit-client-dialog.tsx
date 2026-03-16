@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -9,59 +9,71 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { addClient } from '@/app/actions';
+import { updateClient } from '@/app/actions';
 import { useAppToast } from '@/hooks/use-app-toast';
-import { UserPlus } from 'lucide-react';
 
-export function AddClientDialog() {
-  const [open, setOpen] = useState(false);
+type Client = {
+  id: string;
+  name: string | null;
+  company_name?: string | null;
+  vat_number?: string | null;
+  tax_code?: string | null;
+  internal_code?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+};
+
+export function EditClientDialog({
+  client,
+  open,
+  onOpenChange,
+}: {
+  client: Client;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { success, error: toastError } = useAppToast();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!open) setError(null);
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     const formData = new FormData(e.currentTarget);
-    const name = (formData.get('company_name') as string)?.trim() || (formData.get('name') as string)?.trim();
-    if (!name) {
-      setError('Ragione sociale o nome richiesto');
-      setLoading(false);
-      return;
-    }
-    formData.set('name', name);
-    const result = await addClient(formData);
+    const result = await updateClient(client.id, formData);
     setLoading(false);
     if (result?.error) {
       setError(result.error);
       toastError('Errore', result.error);
       return;
     }
-    success('Cliente aggiunto', 'Il cliente è stato creato. Puoi inviare il link di caricamento dalla scheda dettaglio.');
-    setOpen(false);
+    success('Cliente aggiornato', 'Le modifiche sono state salvate.');
+    onOpenChange(false);
     router.refresh();
   }
 
+  const displayName = client.company_name || client.name || '';
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <UserPlus className="mr-2 h-4 w-4" />
-          Aggiungi cliente
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nuovo cliente</DialogTitle>
+          <DialogTitle>Modifica cliente</DialogTitle>
           <DialogDescription>
-            Inserisci i dati del cliente. Il link per il caricamento documenti verrà generato automaticamente.
+            Aggiorna i dati anagrafici del cliente.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -71,43 +83,49 @@ export function AddClientDialog() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2 space-y-2">
               <Label htmlFor="company_name">Ragione sociale / Nome *</Label>
-              <Input id="company_name" name="company_name" placeholder="Es. Rossi S.r.l." required />
+              <Input
+                id="company_name"
+                name="company_name"
+                defaultValue={displayName}
+                placeholder="Es. Rossi S.r.l."
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="vat_number">P.IVA</Label>
-              <Input id="vat_number" name="vat_number" placeholder="12345678901" />
+              <Input id="vat_number" name="vat_number" defaultValue={client.vat_number ?? ''} placeholder="12345678901" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="tax_code">Codice fiscale</Label>
-              <Input id="tax_code" name="tax_code" placeholder="RSSMRA80A01H501Z" />
+              <Input id="tax_code" name="tax_code" defaultValue={client.tax_code ?? ''} placeholder="RSSMRA80A01H501Z" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="internal_code">Codice interno</Label>
-              <Input id="internal_code" name="internal_code" placeholder="Opzionale" />
+              <Input id="internal_code" name="internal_code" defaultValue={client.internal_code ?? ''} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="contact_name">Referente</Label>
-              <Input id="contact_name" name="contact_name" placeholder="Nome e cognome" />
+              <Input id="contact_name" name="contact_name" defaultValue={client.contact_name ?? ''} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="contact_email">Email contatto</Label>
-              <Input id="contact_email" name="contact_email" type="email" placeholder="cliente@email.it" />
+              <Input id="contact_email" name="contact_email" type="email" defaultValue={client.contact_email ?? client.email ?? ''} />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="email">Email (secondaria)</Label>
-              <Input id="email" name="email" type="email" placeholder="Opzionale" />
+              <Input id="email" name="email" type="email" defaultValue={client.email ?? ''} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Telefono</Label>
-              <Input id="phone" name="phone" type="tel" placeholder="Opzionale" />
+              <Input id="phone" name="phone" type="tel" defaultValue={client.phone ?? ''} />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="notes">Note</Label>
-              <Input id="notes" name="notes" placeholder="Note interne" />
+              <Input id="notes" name="notes" defaultValue={client.notes ?? ''} />
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Annulla
             </Button>
             <Button type="submit" disabled={loading}>

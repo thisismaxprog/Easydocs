@@ -65,10 +65,13 @@ export async function uploadDocument(formData: FormData) {
     const { error: insertError } = await admin.from('documents').insert({
       firm_id: firmId,
       client_id: clientId || null,
+      uploaded_by_user_id: user.id,
+      source_type: 'firm_upload',
       filename: file.name,
       storage_path: storagePath,
       mime_type: file.type,
       status: 'uploaded',
+      classification_status: 'assigned',
     });
 
     if (insertError) return { error: insertError.message };
@@ -115,10 +118,13 @@ export async function prepareDocumentUpload(clientId: string | null, filename: s
     const { error: insertError } = await admin.from('documents').insert({
       firm_id: firmId,
       client_id: clientId || null,
+      uploaded_by_user_id: user.id,
+      source_type: 'firm_upload',
       filename,
       storage_path: storagePath,
       mime_type: null,
       status: 'uploaded',
+      classification_status: 'assigned',
     });
 
     if (insertError) return { error: insertError.message };
@@ -231,22 +237,99 @@ export async function updateDocumentFields(
   return { success: true };
 }
 
+function generateUploadToken(): string {
+  const bytes = new Uint8Array(24);
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  }
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export async function addClient(formData: FormData) {
+  const supabase = await createClient();
   const firmId = await requireFirm();
-  const name = (formData.get('name') as string)?.trim();
-  if (!name) return { error: 'Nome cliente richiesto' };
+  const { data: { user } } = await supabase.auth.getUser();
+  const name = (formData.get('name') as string)?.trim() || (formData.get('company_name') as string)?.trim();
+  if (!name) return { error: 'Nome o ragione sociale richiesto' };
 
   const admin = createServiceRoleClient();
-  const { error } = await admin.from('clients').insert({
+  const uploadToken = generateUploadToken();
+  const { data: client, error } = await admin.from('clients').insert({
     firm_id: firmId,
     name,
+    company_name: name,
     vat_number: (formData.get('vat_number') as string)?.trim() || null,
+    tax_code: (formData.get('tax_code') as string)?.trim() || null,
+    internal_code: (formData.get('internal_code') as string)?.trim() || null,
+    contact_name: (formData.get('contact_name') as string)?.trim() || null,
+    contact_email: (formData.get('contact_email') as string)?.trim() || (formData.get('email') as string)?.trim() || null,
     email: (formData.get('email') as string)?.trim() || null,
-  });
+    phone: (formData.get('phone') as string)?.trim() || null,
+    notes: (formData.get('notes') as string)?.trim() || null,
+    invitation_status: 'not_invited',
+    upload_token: uploadToken,
+  }).select('id').single();
 
   if (error) return { error: error.message };
+  await admin.from('audit_logs').insert({
+    firm_id: firmId,
+    user_id: user?.id ?? null,
+    action: 'client.created',
+    entity_type: 'client',
+    entity_id: client?.id,
+    meta: { name },
+  });
   revalidatePath('/clients');
+  revalidatePath('/overview');
+  return { success: true, clientId: client?.id };
+}
+
+export async function updateClient(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+  const firmId = await requireFirm();
+  const { data: { user } } = await supabase.auth.getUser();
+  const admin = createServiceRoleClient();
+  const name = (formData.get('name') as string)?.trim() || (formData.get('company_name') as string)?.trim();
+  const { error } = await admin.from('clients').update({
+    name: name || undefined,
+    company_name: (formData.get('company_name') as string)?.trim() || name || undefined,
+    vat_number: (formData.get('vat_number') as string)?.trim() || null,
+    tax_code: (formData.get('tax_code') as string)?.trim() || null,
+    internal_code: (formData.get('internal_code') as string)?.trim() || null,
+    contact_name: (formData.get('contact_name') as string)?.trim() || null,
+    contact_email: (formData.get('contact_email') as string)?.trim() || (formData.get('email') as string)?.trim() || null,
+    email: (formData.get('email') as string)?.trim() || null,
+    phone: (formData.get('phone') as string)?.trim() || null,
+    notes: (formData.get('notes') as string)?.trim() || null,
+  }).eq('id', clientId).eq('firm_id', firmId);
+
+  if (error) return { error: error.message };
+  await admin.from('audit_logs').insert({
+    firm_id: firmId,
+    user_id: user?.id ?? null,
+    action: 'client.updated',
+    entity_type: 'client',
+    entity_id: clientId,
+  });
+  revalidatePath('/clients');
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath('/overview');
   return { success: true };
+}
+
+/** Assicura che il cliente abbia un upload_token; lo genera se mancante. */
+export async function ensureClientUploadToken(clientId: string) {
+  const firmId = await requireFirm();
+  const admin = createServiceRoleClient();
+  const { data: client } = await admin.from('clients').select('upload_token').eq('id', clientId).eq('firm_id', firmId).single();
+  if (!client) return { error: 'Cliente non trovato' };
+  if (client.upload_token) return { uploadToken: client.upload_token };
+  const uploadToken = generateUploadToken();
+  const { error } = await admin.from('clients').update({ upload_token: uploadToken }).eq('id', clientId).eq('firm_id', firmId);
+  if (error) return { error: error.message };
+  revalidatePath(`/clients/${clientId}`);
+  revalidatePath('/clients');
+  return { uploadToken };
 }
 
 export async function updateFirmName(name: string) {

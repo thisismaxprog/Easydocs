@@ -10,15 +10,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { LayoutDashboard, Users, FileText, Settings, HelpCircle } from 'lucide-react';
-
-const routes = [
-  { href: '/overview', label: 'Overview', icon: LayoutDashboard },
-  { href: '/clients', label: 'Clienti', icon: Users },
-  { href: '/documents', label: 'Documenti', icon: FileText },
-  { href: '/settings', label: 'Impostazioni', icon: Settings },
-  { href: '/help', label: 'Aiuto', icon: HelpCircle },
-];
+import { dashboardNav } from '@/lib/nav';
 
 type CommandPaletteContextType = {
   open: boolean;
@@ -49,7 +41,7 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
         <CommandList>
           <CommandEmpty>Nessun risultato.</CommandEmpty>
           <CommandGroup heading="Navigazione">
-            {routes.map((r) => {
+            {dashboardNav.map((r) => {
               const Icon = r.icon;
               return (
                 <CommandItem

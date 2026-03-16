@@ -25,6 +25,7 @@ MVP production-grade per studi commercialisti: gestione clienti, upload document
 2. In **SQL Editor** esegui nell’ordine:
    - `supabase/schema.sql` (tabelle, indici, trigger)
    - `supabase/rls.sql` (policy RLS)
+   - `supabase/migrations/001_upgrade_saas.sql` (estensione clienti, documenti, inviti, ruoli)
 3. **Storage**: crea un bucket chiamato `documents` (privato).  
    Opzionale: esegui `supabase/storage.sql` per creare il bucket e le policy via SQL (alcuni progetti potrebbero richiedere di creare il bucket da Dashboard e poi solo le policy da SQL).
 4. In **Authentication > Providers** abilita Email (e opzionalmente Magic Link).
@@ -62,11 +63,34 @@ Apri [http://localhost:3000](http://localhost:3000). Dopo la registrazione verra
 5. Dettaglio documento: **Preview** (anteprima file), **Campi estratti** (modifica e Salva), **Approve** / **Da revisionare**, **Cronologia** (audit).
 6. **Export CSV**: solo documenti in stato `approved`; scegli mese e (opzionale) cliente, poi Scarica.
 
-## Limitazioni MVP e roadmap
+## Modello dati (upgrade SaaS)
 
-- **OCR**: non incluso. Documenti solo immagine o PDF scansionato restano in `needs_review` con inserimento manuale. Roadmap: integrazione OCR (es. Tesseract o servizio cloud) per estrazione testo da scan.
-- **Inviti membri**: la pagina Impostazioni mostra l’elenco membri; l’invito di nuovi utenti allo studio è previsto in un aggiornamento.
-- **Relazione documenti–clienti**: in PostgREST la relazione da `documents.client_id` verso `clients` può essere esposta come `client` (singolare). Se le query che usano `clients(...)` dovessero dare errore, sostituire con `client(...)` nelle select.
+- **Firm (studio)**: workspace principale; può avere più utenti (ruoli: owner, admin, collaborator).
+- **Clients**: anagrafica estesa (ragione sociale, P.IVA, codice fiscale, referente, email, telefono, note, stato invito, `upload_token` univoco).
+- **Documents**: `source_type` (firm_upload, upload_link, client_portal, email, unknown), `classification_status` (assigned, suggested, unmatched), `uploaded_by_user_id`, campi per matching futuro (`match_confidence`, `match_reason`).
+- **Client invitations**: tabella `client_invitations` per flusso invito (token, scadenza, stato); da completare con email e pagina `/join?token=...`.
+
+## Link di caricamento cliente
+
+Ogni cliente ha un **link di caricamento** univoco (`/upload/[token]`):
+
+1. Dalla scheda **Cliente** (Dashboard → Clienti → clic su un cliente) viene mostrato il link e il pulsante **Copia link**.
+2. Il cliente apre il link (senza login): vede il nome dello studio/cliente e un’area drag & drop per caricare file (PDF, immagini).
+3. I documenti caricati tramite questo link vengono associati automaticamente a quel cliente (`source_type = upload_link`, `client_id` impostato).
+4. L’API pubblica `GET/POST /api/upload-link` gestisce la validazione del token e l’upload (service role per scrivere su Storage e su `documents`).
+
+## Assegnazione documenti
+
+- **Upload da studio** (Dashboard/Documenti): l’utente può scegliere opzionalmente un cliente; `source_type = firm_upload`, `classification_status = assigned`.
+- **Upload da link cliente**: il token identifica il cliente; `source_type = upload_link`, `client_id` e `classification_status = assigned`.
+- **Futuro**: matching automatico (P.IVA, codice fiscale, nome da OCR) con `document_extracted_entities` e `document_match_candidates`; per ora l’architettura è predisposta, la logica deterministica è solo “upload link → cliente noto”.
+
+## Limitazioni e roadmap
+
+- **OCR / Vision**: supporto per immagini e PDF senza testo (OpenAI Vision e fallback pdf-to-img) già incluso; OCR completo separato in roadmap.
+- **Inviti clienti**: tabella e campi pronti; flusso “Invia invito” → email con link `/join?token=...` → registrazione cliente legata al record è in fase 2 (placeholder/mock email).
+- **Import CSV clienti**: previsto in fase 2 (mapping colonne, validazione, template scaricabile).
+- Vedi `docs/TODOS_SAAS.md` per le prossime fasi.
 
 ## Struttura principali route
 
@@ -74,10 +98,12 @@ Apri [http://localhost:3000](http://localhost:3000). Dopo la registrazione verra
 |-------|-------------|
 | `/login`, `/signup` | Auth |
 | `/create-firm` | Onboarding: crea lo studio al primo accesso |
-| `/overview` | Dashboard: KPI, ultimi documenti, attività |
-| `/clients` | Anagrafica clienti + Aggiungi cliente |
+| `/overview` | Dashboard: KPI, clienti, documenti, attività |
+| `/clients` | Anagrafica clienti, filtri, Aggiungi cliente |
+| `/clients/[id]` | Dettaglio cliente, link di caricamento, documenti del cliente |
 | `/documents` | Elenco documenti, filtri, Carica, Export CSV |
 | `/documents/[id]` | Preview, campi estratti, Approva, cronologia |
+| `/upload/[token]` | Pagina pubblica per caricare documenti (link cliente) |
 | `/settings` | Nome studio, elenco membri |
 | `/help` | FAQ e contatti |
 

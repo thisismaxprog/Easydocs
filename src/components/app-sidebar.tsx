@@ -2,26 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  Settings,
-  HelpCircle,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-
-const nav = [
-  { href: '/overview', label: 'Overview', icon: LayoutDashboard },
-  { href: '/clients', label: 'Clienti', icon: Users },
-  { href: '/documents', label: 'Documenti', icon: FileText },
-  { href: '/settings', label: 'Impostazioni', icon: Settings },
-  { href: '/help', label: 'Aiuto', icon: HelpCircle },
-];
+import { dashboardNav } from '@/lib/nav';
 
 export function AppSidebar({ collapsed: initialCollapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
@@ -42,7 +27,7 @@ export function AppSidebar({ collapsed: initialCollapsed = false }: { collapsed?
         )}
       </div>
       <nav className="flex-1 space-y-0.5 p-2">
-        {nav.map((item) => {
+        {dashboardNav.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || (item.href !== '/overview' && pathname.startsWith(item.href));
           return (

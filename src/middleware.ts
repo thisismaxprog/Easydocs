@@ -26,12 +26,21 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    const { data: { user } } = await supabase.auth.getUser();
+    // Timeout 2.5s: evita 504 MIDDLEWARE_INVOCATION_TIMEOUT se Supabase è lento
+    const userResult = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<{ data: { user: null } }>((resolve) =>
+        setTimeout(() => resolve({ data: { user: null } }), 2500)
+      ),
+    ]);
+    const user = userResult.data?.user ?? null;
+
     const path = request.nextUrl.pathname;
     const isAuthRoute = path === '/login' || path === '/signup';
     const isOnboarding = path === '/create-firm';
+    const isUploadLink = path.startsWith('/upload/');
 
-    if (!user && !isAuthRoute && !isOnboarding) {
+    if (!user && !isAuthRoute && !isOnboarding && !isUploadLink) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       return NextResponse.redirect(url);
