@@ -98,7 +98,7 @@ export function DocumentDetailClient({
   async function onSave(values: FormValues) {
     setSaving(true);
     const result = await updateDocumentFields(doc.id, {
-      doc_type: values.doc_type || undefined,
+      doc_type: values.doc_type && values.doc_type !== '__none__' ? values.doc_type : undefined,
       doc_date: values.doc_date || undefined,
       doc_number: values.doc_number || undefined,
       total: values.total ? Number(values.total) : undefined,
@@ -209,28 +209,29 @@ export function DocumentDetailClient({
                     <Controller
                       name="doc_type"
                       control={form.control}
-                      render={({ field }) => (
-                        <Select
-                          value={field.value ?? ''}
-                          onValueChange={(v) => field.onChange(v || undefined)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleziona tipo">
-                              {field.value != null && field.value !== ''
-                                ? getDocTypeLabel(String(field.value))
-                                : null}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">—</SelectItem>
-                            {DOC_TYPE_OPTIONS.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
+                      render={({ field }) => {
+                        const selectValue = field.value && field.value !== '' ? field.value : '__none__';
+                        return (
+                          <Select
+                            value={selectValue}
+                            onValueChange={(v) => field.onChange(v === '__none__' ? undefined : v)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleziona tipo">
+                                {selectValue !== '__none__' ? getDocTypeLabel(String(selectValue)) : null}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">—</SelectItem>
+                              {DOC_TYPE_OPTIONS.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      }}
                     />
                   </div>
                   <div className="space-y-2">
