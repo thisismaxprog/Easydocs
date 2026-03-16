@@ -67,6 +67,17 @@ export function DocumentDetailClient({
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
 
+  if (!doc?.id) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[40vh] gap-4 text-center">
+        <p className="text-muted-foreground">Dati documento non disponibili.</p>
+        <Button variant="outline" asChild>
+          <Link href="/documents">Torna ai documenti</Link>
+        </Button>
+      </div>
+    );
+  }
+
   const json = ext?.extracted_json && typeof ext.extracted_json === 'object' ? ext.extracted_json : null;
   const safeStr = (v: unknown) => (v != null && typeof v === 'string' ? v : v != null ? String(v) : '');
   const safeNum = (v: unknown) => (typeof v === 'number' && !Number.isNaN(v) ? v : typeof v === 'string' ? Number(v) : null);
@@ -123,7 +134,7 @@ export function DocumentDetailClient({
     router.refresh();
   }
 
-  const conf = ext?.confidence ?? 0;
+  const conf = typeof ext?.confidence === 'number' && !Number.isNaN(ext.confidence) ? ext.confidence : 0;
   const actionLabels: Record<string, string> = {
     'document.uploaded': 'Caricato',
     'document.processing': 'In elaborazione',
@@ -255,10 +266,10 @@ export function DocumentDetailClient({
             </TabsContent>
             <TabsContent value="audit">
               <ul className="space-y-2 text-sm">
-                {auditLogs.length === 0 ? (
+                {(Array.isArray(auditLogs) ? auditLogs : []).length === 0 ? (
                   <li className="text-muted-foreground">Nessuna attività.</li>
                 ) : (
-                  auditLogs.map((log) => (
+                  (Array.isArray(auditLogs) ? auditLogs : []).map((log) => (
                     <li key={log.id} className="flex justify-between">
                       <span>{actionLabels[log.action] ?? log.action}</span>
                       <span className="text-muted-foreground">{new Date(log.created_at).toLocaleString('it')}</span>

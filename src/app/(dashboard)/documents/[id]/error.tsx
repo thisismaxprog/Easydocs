@@ -23,6 +23,11 @@ export default function DocumentDetailError({
       <p className="mt-2 text-sm text-muted-foreground max-w-md">
         Si è verificato un errore nel caricamento. Puoi riprovare o tornare all’elenco documenti.
       </p>
+      {error?.message && (
+        <p className="mt-3 text-xs text-muted-foreground max-w-lg font-mono bg-muted/50 px-3 py-2 rounded break-all">
+          {error.message}
+        </p>
+      )}
       <div className="mt-6 flex gap-3">
         <Button onClick={reset}>Riprova</Button>
         <Button variant="outline" asChild>
