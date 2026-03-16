@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { FileText, Upload, Download } from 'lucide-react';
+import { getDocTypeLabel } from '@/lib/doc-type-labels';
 import { UploadDocumentDialog } from '@/components/upload-document-dialog';
 import { ExportCsvDialog } from './export-csv-dialog';
 
@@ -175,7 +176,7 @@ export function DocumentsPageClient({
                       <TableCell>
                         <Badge variant={doc.status as 'processing' | 'needs_review' | 'approved' | 'failed' | 'uploaded' | 'extracted'}>{doc.status}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{doc.doc_type ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{getDocTypeLabel(doc.doc_type)}</TableCell>
                       <TableCell className="text-muted-foreground">{doc.doc_date ?? '—'}</TableCell>
                       <TableCell className="text-right">{doc.total != null ? `€ ${Number(doc.total).toFixed(2)}` : '—'}</TableCell>
                     </TableRow>

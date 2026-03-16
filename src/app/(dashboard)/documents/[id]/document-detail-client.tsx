@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Save, CheckCircle, AlertCircle } from 'lucide-react';
@@ -13,6 +13,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { DOC_TYPE_OPTIONS, getDocTypeLabel } from '@/lib/doc-type-labels';
 import { updateDocumentFields, updateDocumentStatus } from '@/app/actions';
 import { useAppToast } from '@/hooks/use-app-toast';
 import type { ExtractionJson } from '@/lib/types';
@@ -180,7 +188,30 @@ export function DocumentDetailClient({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Tipo documento</Label>
-                    <Input {...form.register('doc_type')} placeholder="invoice, receipt, …" />
+                    <Controller
+                      name="doc_type"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Select
+                          value={field.value ?? ''}
+                          onValueChange={(v) => field.onChange(v || undefined)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleziona tipo">
+                              {field.value ? getDocTypeLabel(field.value) : null}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">—</SelectItem>
+                            {DOC_TYPE_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Data (YYYY-MM-DD)</Label>

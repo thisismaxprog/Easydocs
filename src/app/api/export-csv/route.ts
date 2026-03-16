@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentFirmId } from '@/lib/get-firm-id';
+import { getDocTypeLabel } from '@/lib/doc-type-labels';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
         d.filename,
         c?.name ?? '',
         c?.vat_number ?? '',
-        d.doc_type ?? '',
+        getDocTypeLabel(d.doc_type),
         d.doc_date ?? '',
         d.doc_number ?? '',
         d.total != null ? String(d.total) : '',

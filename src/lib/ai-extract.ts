@@ -3,23 +3,35 @@ import { extractionJsonSchema, type ExtractionJson } from '@/lib/extraction-sche
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-const SYSTEM_PROMPT = `Sei un assistente che estrae dati da fatture e documenti contabili italiani.
+const SYSTEM_PROMPT = `Sei un assistente che estrae dati da documenti contabili italiani: FATTURE e SCONTRINI.
 Rispondi SOLO con un JSON valido, senza markdown né testo aggiuntivo.
+
+Tipi di documento:
+- "invoice" = fattura (con numero fattura, cliente/fornitore, imponibile, IVA, totale)
+- "receipt" = scontrino o ricevuta (data, totale, eventuale numero)
+- "other" = altro solo se proprio non è né fattura né scontrino
+
 Schema da rispettare:
 {
   "doc_type": "invoice" | "receipt" | "bank" | "utility" | "other" | null,
-  "vendor_name": string | null,
+  "vendor_name": string | null (ragione sociale del fornitore/emittente),
   "vendor_vat": string | null (P.IVA fornitore, 11 cifre se Italia),
-  "doc_number": string | null (numero documento),
-  "doc_date": "YYYY-MM-DD" | null,
-  "net_amount": number | null (imponibile),
-  "vat_amount": number | null (IVA),
-  "total_amount": number | null (totale),
+  "doc_number": string | null (numero fattura es. "2/FE", o numero scontrino se presente),
+  "doc_date": "YYYY-MM-DD" | null (data documento: converti da GG/MM/AAAA in YYYY-MM-DD),
+  "net_amount": number | null (imponibile, solo numeri),
+  "vat_amount": number | null (IVA, solo numeri),
+  "total_amount": number | null (totale documento: numero senza virgole/apici, es. 23800 per 23.800,00),
   "currency": "EUR" | null,
   "notes": string | null,
-  "confidence": number (0-1, quanto sei sicuro dell'estrazione)
+  "confidence": number (0-1)
 }
-Se un campo non è presente o non riconoscibile, usa null. Per confidence usa 1 se tutto è chiaro, valori più bassi se il documento è parziale o ambiguo.`;
+
+Regole importanti:
+- Per fatture: estrai sempre data, numero documento e totale quando visibili; doc_type = "invoice".
+- Per scontrini: estrai almeno data e totale; doc_type = "receipt".
+- Date italiane (es. 01/07/2024) → doc_date in formato "YYYY-MM-DD" (es. "2024-07-01").
+- Importi: ignora apostrofi e virgole (es. 23'800,00 o 23.800,00 → total_amount: 23800).
+- Se un campo non c’è proprio, usa null. confidence: 1 se lettura chiara, 0.5-0.8 se parziale o poco nitido.`;
 
 export async function extractFromText(text: string): Promise<{
   data: ExtractionJson;
@@ -68,7 +80,7 @@ export async function extractFromImage(
         content: [
           {
             type: 'text',
-            text: 'Estrai i dati da questa immagine di un documento contabile (fattura, ricevuta, ecc.). Rispondi solo con il JSON.',
+            text: 'Questa immagine è una FATTURA o uno SCONTRINO italiano. Estrai i dati nel JSON richiesto. In particolare: tipo (invoice/receipt), data in YYYY-MM-DD, numero documento se presente, totale come numero. Rispondi solo con il JSON, niente altro testo.',
           },
           {
             type: 'image_url',

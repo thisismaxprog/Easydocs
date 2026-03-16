@@ -75,14 +75,14 @@ export async function processDocument(documentId: string): Promise<void> {
     try {
       const { data: extracted } = await extractFromImage(imageBuffer, imageMime);
       const issues: string[] = [];
-      if (extracted.confidence < 0.6) issues.push('Confidenza bassa: verificare i campi.');
+      if (extracted.confidence < 0.4) issues.push('Confidenza bassa: verificare i campi.');
       if (extracted.vendor_vat && !isValidItalianVat(extracted.vendor_vat)) {
         issues.push('P.IVA fornitore non valida (attese 11 cifre per Italia).');
       }
       if (!amountsConsistent(extracted.net_amount, extracted.vat_amount, extracted.total_amount)) {
         issues.push('Imponibile + IVA non coerenti con il totale.');
       }
-      const status = issues.length > 0 || extracted.confidence < 0.7 ? 'needs_review' : 'extracted';
+      const status = issues.length > 0 || extracted.confidence < 0.6 ? 'needs_review' : 'extracted';
       await supabase.from('documents').update({
         status,
         doc_type: extracted.doc_type,
@@ -120,14 +120,14 @@ export async function processDocument(documentId: string): Promise<void> {
         const firstPage = await document.getPage(1);
         const { data: extracted } = await extractFromImage(firstPage, 'image/png');
         const issues: string[] = [];
-        if (extracted.confidence < 0.6) issues.push('Confidenza bassa: verificare i campi.');
+        if (extracted.confidence < 0.4) issues.push('Confidenza bassa: verificare i campi.');
         if (extracted.vendor_vat && !isValidItalianVat(extracted.vendor_vat)) {
           issues.push('P.IVA fornitore non valida (attese 11 cifre per Italia).');
         }
         if (!amountsConsistent(extracted.net_amount, extracted.vat_amount, extracted.total_amount)) {
           issues.push('Imponibile + IVA non coerenti con il totale.');
         }
-        const status = issues.length > 0 || extracted.confidence < 0.7 ? 'needs_review' : 'extracted';
+        const status = issues.length > 0 || extracted.confidence < 0.6 ? 'needs_review' : 'extracted';
         await supabase.from('documents').update({
           status,
           doc_type: extracted.doc_type,
@@ -178,7 +178,7 @@ export async function processDocument(documentId: string): Promise<void> {
     const { data: extracted } = await extractFromText(text);
     const issues: string[] = [];
 
-    if (extracted.confidence < 0.6) {
+    if (extracted.confidence < 0.4) {
       issues.push('Confidenza bassa: verificare i campi.');
     }
     if (extracted.vendor_vat && !isValidItalianVat(extracted.vendor_vat)) {
@@ -188,7 +188,7 @@ export async function processDocument(documentId: string): Promise<void> {
       issues.push('Imponibile + IVA non coerenti con il totale.');
     }
 
-    const status = issues.length > 0 || extracted.confidence < 0.7 ? 'needs_review' : 'extracted';
+    const status = issues.length > 0 || extracted.confidence < 0.6 ? 'needs_review' : 'extracted';
 
     await supabase.from('documents').update({
       status,
