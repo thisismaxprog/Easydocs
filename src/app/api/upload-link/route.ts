@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/admin';
 import { processDocument } from '@/lib/process-document';
 
+function inferMimeFromFilename(filename: string): string {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.avif')) return 'image/avif';
+  return 'application/octet-stream';
+}
+
 /** GET: restituisce i dati del cliente per il token (pagina upload pubblica). */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');
@@ -64,11 +74,12 @@ export async function POST(request: NextRequest) {
     const docId = crypto.randomUUID();
     const storagePath = `firm/${client.firm_id}/client/${client.id}/${docId}-${file.name}`;
 
+    const mimeType = file.type || inferMimeFromFilename(file.name);
     const buf = Buffer.from(await file.arrayBuffer());
     const { error: uploadError } = await admin.storage
       .from('documents')
       .upload(storagePath, buf, {
-        contentType: file.type || 'application/octet-stream',
+        contentType: mimeType,
         upsert: false,
       });
 
@@ -84,7 +95,7 @@ export async function POST(request: NextRequest) {
       source_type: 'upload_link',
       filename: file.name,
       storage_path: storagePath,
-      mime_type: file.type || null,
+      mime_type: mimeType === 'application/octet-stream' ? null : mimeType,
       status: 'uploaded',
       classification_status: 'assigned',
     });

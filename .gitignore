@@ -5,6 +5,8 @@ node_modules
 
 # Build
 .next
+scripts/
+src/lib/scripts/
 out
 build
 dist

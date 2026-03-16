@@ -24,6 +24,16 @@ export async function processDocument(documentId: string): Promise<void> {
     .update({ status: 'processing' })
     .eq('id', documentId);
 
+  function inferMimeFromPath(p: string): string {
+    const lower = p.toLowerCase();
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.avif')) return 'image/avif';
+    return '';
+  }
+
   let text = '';
   let imageBuffer: Buffer | null = null;
   let imageMime = '';
@@ -37,7 +47,7 @@ export async function processDocument(documentId: string): Promise<void> {
       throw new Error('File not found');
     }
 
-    const mime = doc.mime_type || '';
+    const mime = doc.mime_type || inferMimeFromPath(doc.storage_path) || '';
     if (mime === 'application/pdf') {
       const pdfParse = (await import('pdf-parse')).default;
       const buf = await fileData.arrayBuffer();
