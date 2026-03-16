@@ -91,7 +91,8 @@ export async function uploadDocument(formData: FormData) {
         entity_id: doc.id,
         meta: { filename: file.name },
       });
-      processDocument(doc.id).catch(console.error);
+      // Attende l'estrazione AI prima di rispondere
+      await processDocument(doc.id);
     }
 
     revalidatePath('/documents');
@@ -158,7 +159,8 @@ export async function confirmDocumentUpload(documentId: string, mimeType: string
   try {
     const admin = createServiceRoleClient();
     await admin.from('documents').update({ mime_type: mimeType }).eq('id', documentId);
-    processDocument(documentId).catch(console.error);
+    // Attende l'estrazione AI prima di rispondere
+    await processDocument(documentId);
     revalidatePath('/documents');
     revalidatePath('/overview');
     return { success: true };

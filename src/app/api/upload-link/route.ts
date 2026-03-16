@@ -120,7 +120,8 @@ export async function POST(request: NextRequest) {
         entity_id: doc.id,
         meta: { filename: file.name, source: 'upload_link', client_id: client.id },
       });
-      processDocument(doc.id).catch(console.error);
+      // Attende l'estrazione AI prima di rispondere (importante su serverless)
+      await processDocument(doc.id);
     }
 
     return NextResponse.json({ success: true, documentId: doc?.id });
