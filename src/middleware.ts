@@ -39,8 +39,9 @@ export async function middleware(request: NextRequest) {
     const isAuthRoute = path === '/login' || path === '/signup';
     const isOnboarding = path === '/create-firm';
     const isUploadLink = path.startsWith('/upload/');
+    const isUploadLinkApi = path === '/api/upload-link';
 
-    if (!user && !isAuthRoute && !isOnboarding && !isUploadLink) {
+    if (!user && !isAuthRoute && !isOnboarding && !isUploadLink && !isUploadLinkApi) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       return NextResponse.redirect(url);

@@ -34,6 +34,12 @@ update public.clients set contact_email = email where contact_email is null and 
 create index if not exists idx_clients_upload_token on public.clients(upload_token) where upload_token is not null;
 create index if not exists idx_clients_invitation_status on public.clients(invitation_status);
 
+-- Assegna un upload_token a tutti i clienti che non ce l'hanno (così il link di caricamento funziona)
+-- Dopo aver eseguito questo, apri la scheda cliente nell'app per vedere/copiare il link (il token è già nel DB)
+update public.clients
+set upload_token = encode(gen_random_bytes(24), 'hex')
+where upload_token is null;
+
 -- Documents: source type, classification, matching, uploader
 alter table public.documents add column if not exists uploaded_by_user_id uuid references auth.users(id) on delete set null;
 alter table public.documents add column if not exists source_type text not null default 'firm_upload'

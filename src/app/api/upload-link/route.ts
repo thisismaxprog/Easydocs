@@ -8,14 +8,27 @@ export async function GET(request: NextRequest) {
   if (!token) {
     return NextResponse.json({ valid: false, error: 'Token mancante' }, { status: 400 });
   }
-  const admin = createServiceRoleClient();
+
+  let admin;
+  try {
+    admin = createServiceRoleClient();
+  } catch (e) {
+    console.error('[upload-link] createServiceRoleClient failed:', e);
+    return NextResponse.json({ valid: false, error: 'Configurazione server mancante' }, { status: 500 });
+  }
+
   const { data: client, error } = await admin
     .from('clients')
     .select('id, company_name, name, firm_id')
     .eq('upload_token', token)
     .single();
 
-  if (error || !client) {
+  if (error) {
+    console.error('[upload-link] GET client by token failed:', { tokenLength: token.length, error: error.message, code: error.code });
+    return NextResponse.json({ valid: false, error: 'Link non valido o scaduto' }, { status: 404 });
+  }
+  if (!client) {
+    console.error('[upload-link] No client found for token (length:', token.length, ')');
     return NextResponse.json({ valid: false, error: 'Link non valido o scaduto' }, { status: 404 });
   }
 
