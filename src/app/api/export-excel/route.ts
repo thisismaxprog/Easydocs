@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const month = searchParams.get('month');
   const clientId = searchParams.get('client_id') ?? 'all';
+  const onlyApproved = searchParams.get('only_approved') !== 'false';
   if (!month) {
     return new NextResponse('Parametro month richiesto', { status: 400 });
   }
@@ -25,11 +26,14 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('documents')
-    .select('id, filename, doc_type, doc_date, doc_number, total, clients(name, vat_number)')
+    .select('id, filename, doc_type, doc_date, doc_number, total, status, clients(name, vat_number)')
     .eq('firm_id', firmId)
-    .eq('status', 'approved')
     .gte('doc_date', start)
     .lte('doc_date', end);
+
+  if (onlyApproved) {
+    query = query.eq('status', 'approved');
+  }
 
   if (clientId !== 'all') {
     query = query.eq('client_id', clientId);
@@ -42,7 +46,7 @@ export async function GET(request: Request) {
   }
 
   const rows: (string | number)[][] = [
-    ['File', 'Cliente', 'P.IVA', 'Tipo', 'Data', 'N. doc', 'Totale'],
+    ['File', 'Cliente', 'P.IVA', 'Tipo', 'Data', 'N. doc', 'Totale', ...(onlyApproved ? [] : ['Stato'])],
     ...(docs ?? []).map((d) => {
       const c = d.clients as { name?: string; vat_number?: string } | null;
       const total = d.total != null ? Number(d.total) : null;
@@ -54,12 +58,15 @@ export async function GET(request: Request) {
         d.doc_date ?? '',
         d.doc_number ?? '',
         total != null ? total : '',
+        ...(onlyApproved ? [] : [d.status ?? '']),
       ];
     }),
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  const colWidths = [{ wch: 30 }, { wch: 25 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+  const colWidths = onlyApproved
+    ? [{ wch: 30 }, { wch: 25 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }]
+    : [{ wch: 30 }, { wch: 25 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }];
   ws['!cols'] = colWidths;
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Documenti');

@@ -7,6 +7,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const month = searchParams.get('month');
   const clientId = searchParams.get('client_id') ?? 'all';
+  const onlyApproved = searchParams.get('only_approved') !== 'false';
   if (!month) {
     return new NextResponse('Parametro month richiesto', { status: 400 });
   }
@@ -24,11 +25,14 @@ export async function GET(request: Request) {
 
   let query = supabase
     .from('documents')
-    .select('id, filename, doc_type, doc_date, doc_number, total, clients(name, vat_number)')
+    .select('id, filename, doc_type, doc_date, doc_number, total, status, clients(name, vat_number)')
     .eq('firm_id', firmId)
-    .eq('status', 'approved')
     .gte('doc_date', start)
     .lte('doc_date', end);
+
+  if (onlyApproved) {
+    query = query.eq('status', 'approved');
+  }
 
   if (clientId !== 'all') {
     query = query.eq('client_id', clientId);
@@ -41,7 +45,7 @@ export async function GET(request: Request) {
   }
 
   const rows = [
-    ['Filename', 'Cliente', 'P.IVA', 'Tipo', 'Data', 'N. doc', 'Totale'],
+    ['Filename', 'Cliente', 'P.IVA', 'Tipo', 'Data', 'N. doc', 'Totale', ...(onlyApproved ? [] : ['Stato'])],
     ...(docs ?? []).map((d) => {
       const c = d.clients as { name?: string; vat_number?: string } | null;
       return [
@@ -52,6 +56,7 @@ export async function GET(request: Request) {
         d.doc_date ?? '',
         d.doc_number ?? '',
         d.total != null ? String(d.total) : '',
+        ...(onlyApproved ? [] : [d.status ?? '']),
       ];
     }),
   ];

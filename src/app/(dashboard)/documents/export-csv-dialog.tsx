@@ -38,6 +38,7 @@ export function ExportCsvDialog({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const [clientId, setClientId] = useState<string>('all');
+  const [onlyApproved, setOnlyApproved] = useState<'approved' | 'all'>('all');
   const [loading, setLoading] = useState(false);
   const { success, error } = useAppToast();
   const router = useRouter();
@@ -45,7 +46,11 @@ export function ExportCsvDialog({
   async function handleExport(format: 'xlsx' | 'csv') {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ month, client_id: clientId });
+      const params = new URLSearchParams({
+        month,
+        client_id: clientId,
+        only_approved: onlyApproved === 'approved' ? 'true' : 'false',
+      });
       const endpoint = format === 'xlsx' ? `/api/export-excel?${params}` : `/api/export-csv?${params}`;
       const res = await fetch(endpoint);
       if (!res.ok) {
@@ -75,17 +80,20 @@ export function ExportCsvDialog({
         <DialogHeader>
           <DialogTitle>Export</DialogTitle>
           <DialogDescription>
-            Esporta i documenti approvati per un mese (studio intero o singolo cliente) in Excel o CSV.
+            Esporta i documenti per un mese (studio intero o singolo cliente). Seleziona il mese della data documento.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Mese</Label>
+            <Label>Mese (data documento)</Label>
             <Input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Solo i documenti con data in questo mese vengono inclusi.
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Cliente</Label>
@@ -100,6 +108,21 @@ export function ExportCsvDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Includi documenti</Label>
+            <Select value={onlyApproved} onValueChange={(v) => setOnlyApproved(v as 'approved' | 'all')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti (anche estratti e da revisionare)</SelectItem>
+                <SelectItem value="approved">Solo approvati</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Scegli &quot;Tutti&quot; per vedere nell’export anche i documenti non ancora approvati.
+            </p>
           </div>
         </div>
         <DialogFooter>
