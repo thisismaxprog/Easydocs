@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getCurrentFirmId } from '@/lib/get-firm-id';
 import { getDocTypeLabel } from '@/lib/doc-type-labels';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
+
+/** Colore primario Easydocs (da --primary 221 83% 53%) in hex ARGB per Excel */
+const PRIMARY_FILL = { patternType: 'solid' as const, fgColor: { rgb: 'FF2563EB' } };
+const HEADER_FONT = { bold: true, color: { rgb: 'FFFFFFFF' } };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -64,6 +68,17 @@ export async function GET(request: Request) {
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
+  const numCols = rows[0].length;
+  for (let c = 0; c < numCols; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[ref]) {
+      ws[ref].s = {
+        fill: PRIMARY_FILL,
+        font: HEADER_FONT,
+        alignment: { horizontal: 'left', vertical: 'center' },
+      };
+    }
+  }
   const colWidths = onlyApproved
     ? [{ wch: 30 }, { wch: 25 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }]
     : [{ wch: 30 }, { wch: 25 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 12 }];
