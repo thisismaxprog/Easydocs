@@ -89,8 +89,8 @@ export function ExportCsvDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md overflow-hidden sm:max-w-md">
+        <DialogHeader className="min-w-0 shrink-0">
           <DialogTitle>Export</DialogTitle>
           <DialogDescription className="text-left space-y-1">
             <span className="block">
@@ -101,23 +101,24 @@ export function ExportCsvDialog({
             </span>
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="min-w-0 max-w-full space-y-4 overflow-x-hidden">
+          <div className="min-w-0 space-y-2">
             <Label>Mese (data documento)</Label>
             <Input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
+              className="w-full min-w-0 max-w-full"
             />
             <p className="text-xs text-muted-foreground">
               Solo i documenti con data in questo mese vengono inclusi.
             </p>
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label>Cliente</Label>
             <Select value={clientId} onValueChange={setClientId}>
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className="min-w-0 max-w-full">
+                <SelectValue className="truncate" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tutto lo studio</SelectItem>
@@ -127,11 +128,11 @@ export function ExportCsvDialog({
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label>Includi documenti</Label>
             <Select value={onlyApproved} onValueChange={(v) => setOnlyApproved(v as 'approved' | 'all')}>
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className="min-w-0 max-w-full">
+                <SelectValue className="truncate" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tutti (anche estratti e da revisionare)</SelectItem>
@@ -142,27 +143,32 @@ export function ExportCsvDialog({
               Scegli &quot;Tutti&quot; per vedere nell’export anche i documenti non ancora approvati.
             </p>
           </div>
-          <div className="space-y-2">
+          <div className="min-w-0 space-y-2">
             <Label>Formato CSV</Label>
             <Select value={csvPreset} onValueChange={(v) => setCsvPreset(v as 'generic' | 'accounting_it')}>
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className="min-w-0 max-w-full">
+                <SelectValue placeholder="Formato" className="truncate" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="generic">Easydocs (virgola, come Excel)</SelectItem>
-                <SelectItem value="accounting_it">Gestionale IT (; e importi tipo 69,00)</SelectItem>
+              <SelectContent className="max-w-[min(100vw-2rem,20rem)]">
+                <SelectItem value="generic">Easydocs</SelectItem>
+                <SelectItem value="accounting_it">Gestionale IT</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              {csvPreset === 'accounting_it'
+                ? 'CSV con separatore ; e importi tipo 69,00 (molti gestionali italiani).'
+                : 'CSV con virgola, come l’Excel Easydocs.'}
+            </p>
           </div>
         </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Annulla
           </Button>
-          <Button onClick={() => handleExport('xlsx')} disabled={loading}>
+          <Button onClick={() => handleExport('xlsx')} disabled={loading} className="w-full sm:w-auto">
             {loading ? 'Export…' : 'Scarica Excel Easydocs'}
           </Button>
-          <Button type="button" variant="secondary" onClick={() => handleExport('csv')} disabled={loading}>
+          <Button type="button" variant="secondary" onClick={() => handleExport('csv')} disabled={loading} className="w-full sm:w-auto">
             {csvPreset === 'accounting_it' ? 'Scarica CSV gestionale' : 'Scarica CSV'}
           </Button>
         </DialogFooter>
