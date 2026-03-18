@@ -4,7 +4,7 @@ import { requireFirm } from '@/lib/get-firm-id';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Users, ArrowRight, UserPlus, Upload } from 'lucide-react';
+import { FileText, Users, ArrowRight, UserPlus, Upload, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { OverviewUploadButton } from './upload-button';
 import { formatDistanceToNow } from '@/lib/date-utils';
 
@@ -15,7 +15,12 @@ export default async function OverviewPage() {
   todayStart.setHours(0, 0, 0, 0);
   const todayIso = todayStart.toISOString();
 
-  const [docsResult, logsResult, clientsCount, docsCount, approvedRes, needsReviewRes, docsTodayRes] = await Promise.all([
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const thirtyDaysIso = thirtyDaysAgo.toISOString();
+
+  const [docsResult, logsResult, clientsCount, docsCount, approvedRes, needsReviewRes, docsTodayRes, recentByClientRes] =
+    await Promise.all([
     supabase
       .from('documents')
       .select('id, filename, status, created_at, client_id')
@@ -33,6 +38,12 @@ export default async function OverviewPage() {
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('firm_id', firmId).eq('status', 'approved'),
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('firm_id', firmId).eq('status', 'needs_review'),
     supabase.from('documents').select('id', { count: 'exact', head: true }).eq('firm_id', firmId).gte('created_at', todayIso),
+    supabase
+      .from('documents')
+      .select('client_id')
+      .eq('firm_id', firmId)
+      .gte('created_at', thirtyDaysIso)
+      .not('client_id', 'is', null),
   ]);
 
   let clientsNotInvitedCount = 0;
@@ -50,6 +61,20 @@ export default async function OverviewPage() {
   const approvedCount = approvedRes.count ?? 0;
   const needsReviewCount = needsReviewRes.count ?? 0;
   const docsTodayCount = docsTodayRes.count ?? 0;
+
+  const recentClientIds = new Set(
+    (recentByClientRes.data ?? [])
+      .map((r) => r.client_id as string)
+      .filter(Boolean)
+  );
+  const { data: allClientsList } = await supabase
+    .from('clients')
+    .select('id, name')
+    .eq('firm_id', firmId)
+    .order('name')
+    .limit(80);
+  const clientsWithoutRecentUpload =
+    (allClientsList ?? []).filter((c) => !recentClientIds.has(c.id)).slice(0, 6);
 
   const actionLabel: Record<string, string> = {
     'document.uploaded': 'Documento caricato',
@@ -104,15 +129,21 @@ export default async function OverviewPage() {
             <p className="text-xs text-muted-foreground">Totale caricati</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-2 border-emerald-500/40 bg-emerald-500/5 shadow-sm ring-1 ring-emerald-500/20">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Approvati
+            <CardTitle className="text-sm font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Approvati — traguardo
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-2">
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{approvedCount}</div>
-            <p className="text-xs text-muted-foreground">Pronti per export</p>
+            <p className="text-xs text-muted-foreground">
+              Documenti chiusi e pronti per export verso Excel o gestionale. Quando questo numero sale, il giro è completo.
+            </p>
+            <Button size="sm" variant="secondary" className="w-full mt-1" asChild>
+              <Link href="/documents">Vai all&apos;export</Link>
+            </Button>
           </CardContent>
         </Card>
         <Card>
@@ -149,6 +180,31 @@ export default async function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {clientsWithoutRecentUpload.length > 0 && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Clienti senza caricamenti negli ultimi 30 giorni
+            </CardTitle>
+            <CardDescription>
+              Utile per sollecitare prima di scadenze (es. liquidazione IVA). Invia di nuovo il link di caricamento dalla scheda cliente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="flex flex-wrap gap-2">
+              {clientsWithoutRecentUpload.map((c) => (
+                <li key={c.id}>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/clients/${c.id}`}>{c.name}</Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

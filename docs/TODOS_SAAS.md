@@ -6,6 +6,15 @@ Elenco di funzionalità e migliorie previste per le prossime iterazioni.
 
 ## Fase 2 (priorità alta)
 
+- [ ] **Export template gestionali (ultimo miglio)**
+  - Oggi: CSV “contabilità IT” (; e decimali IT) come base
+  - Prossimo: template dedicati TeamSystem / Profis / Ipsoa (tracciato ufficiale o file campione dal commercialista)
+  - Vedi `docs/EXPORT_GESTIONALI.md`
+
+- [ ] **Scadenze IVA / promemoria**
+  - Oggi: dashboard “clienti senza caricamenti da 30 gg”
+  - Prossimo: date scadenza configurabili per studio + notifiche email
+
 - [ ] **Import CSV clienti**
   - Pulsante "Importa clienti" in elenco clienti
   - Upload CSV → anteprima tabella → mapping colonne su campi sistema

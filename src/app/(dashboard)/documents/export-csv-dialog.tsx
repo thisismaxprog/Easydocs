@@ -39,6 +39,7 @@ export function ExportCsvDialog({
   });
   const [clientId, setClientId] = useState<string>('all');
   const [onlyApproved, setOnlyApproved] = useState<'approved' | 'all'>('all');
+  const [csvPreset, setCsvPreset] = useState<'generic' | 'accounting_it'>('generic');
   const [loading, setLoading] = useState(false);
   const { success, error } = useAppToast();
   const router = useRouter();
@@ -51,6 +52,9 @@ export function ExportCsvDialog({
         client_id: clientId,
         only_approved: onlyApproved === 'approved' ? 'true' : 'false',
       });
+      if (format === 'csv') {
+        params.set('preset', csvPreset);
+      }
       const endpoint = format === 'xlsx' ? `/api/export-excel?${params}` : `/api/export-csv?${params}`;
       const res = await fetch(endpoint);
       if (!res.ok) {
@@ -62,10 +66,19 @@ export function ExportCsvDialog({
       const a = document.createElement('a');
       a.href = url;
       const ext = format === 'xlsx' ? 'xlsx' : 'csv';
-      a.download = `export-${month}${clientId !== 'all' ? `-${clientId}` : ''}.${ext}`;
+      const suffix =
+        format === 'csv' && csvPreset === 'accounting_it' ? '-contabilita-it' : '';
+      a.download = `export-${month}${suffix}${clientId !== 'all' ? `-${clientId}` : ''}.${ext}`;
       a.click();
       URL.revokeObjectURL(url);
-      success('Export completato', format === 'xlsx' ? 'Il file Excel è stato scaricato.' : 'Il file CSV è stato scaricato.');
+      success(
+        'Export completato',
+        format === 'xlsx'
+          ? 'File Excel Easydocs scaricato.'
+          : csvPreset === 'accounting_it'
+            ? 'CSV per import gestionale (separatore ;) scaricato.'
+            : 'File CSV scaricato.'
+      );
       onOpenChange(false);
     } catch (e) {
       error('Errore export', e instanceof Error ? e.message : 'Export fallito');
@@ -79,8 +92,13 @@ export function ExportCsvDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Export</DialogTitle>
-          <DialogDescription>
-            Esporta i documenti per un mese (studio intero o singolo cliente). Seleziona il mese della data documento.
+          <DialogDescription className="text-left space-y-1">
+            <span className="block">
+              Excel = formato Easydocs. CSV: scegli tra standard o contabilità IT (punto e virgola, importi tipo 69,00) per import in molti gestionali.
+            </span>
+            <span className="block text-xs">
+              Template dedicati TeamSystem / Profis / Ipsoa: in roadmap, con file campione o tracciato ufficiale.
+            </span>
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -124,16 +142,28 @@ export function ExportCsvDialog({
               Scegli &quot;Tutti&quot; per vedere nell’export anche i documenti non ancora approvati.
             </p>
           </div>
+          <div className="space-y-2">
+            <Label>Formato CSV</Label>
+            <Select value={csvPreset} onValueChange={(v) => setCsvPreset(v as 'generic' | 'accounting_it')}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="generic">Easydocs (virgola, come Excel)</SelectItem>
+                <SelectItem value="accounting_it">Gestionale IT (; e importi tipo 69,00)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Annulla
           </Button>
           <Button onClick={() => handleExport('xlsx')} disabled={loading}>
-            {loading ? 'Export…' : 'Scarica Excel'}
+            {loading ? 'Export…' : 'Scarica Excel Easydocs'}
           </Button>
           <Button type="button" variant="secondary" onClick={() => handleExport('csv')} disabled={loading}>
-            Scarica CSV
+            {csvPreset === 'accounting_it' ? 'Scarica CSV gestionale' : 'Scarica CSV'}
           </Button>
         </DialogFooter>
       </DialogContent>
