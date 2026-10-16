@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import { processDocument } from '@/lib/process-document';
 import { revalidatePath } from 'next/cache';
 import { getCurrentFirmId, requireFirm } from '@/lib/get-firm-id';
+import { isAllowedMimeType, mimeFromFilename, sanitizeFilename } from '@/lib/upload-security';
 
 export { getCurrentFirmId, requireFirm };
 
@@ -40,68 +41,22 @@ export async function createFirm(formData: FormData) {
   redirect('/overview');
 }
 
-export async function uploadDocument(formData: FormData) {
-  try {
-    const supabase = await createClient();
-    const firmId = await requireFirm();
-    const clientId = (formData.get('client_id') as string) || null;
-    const file = formData.get('file') as File;
-    if (!file) return { error: 'File richiesto' };
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: 'Non autenticato' };
-
-    const docId = crypto.randomUUID();
-    const storagePath = `firm/${firmId}/client/${clientId || 'none'}/${docId}-${file.name}`;
-
-    const admin = createServiceRoleClient();
-
-    const { error: uploadError } = await admin.storage
-      .from('documents')
-      .upload(storagePath, file, { upsert: false });
-
-    if (uploadError) return { error: uploadError.message };
-
-    const { error: insertError } = await admin.from('documents').insert({
-      firm_id: firmId,
-      client_id: clientId || null,
-      uploaded_by_user_id: user.id,
-      source_type: 'firm_upload',
-      filename: file.name,
-      storage_path: storagePath,
-      mime_type: file.type,
-      status: 'uploaded',
-      classification_status: 'assigned',
-    });
-
-    if (insertError) return { error: insertError.message };
-
-    const { data: doc } = await admin
-      .from('documents')
-      .select('id')
-      .eq('storage_path', storagePath)
-      .single();
-
-    if (doc) {
-      await admin.from('audit_logs').insert({
-        firm_id: firmId,
-        user_id: user.id,
-        action: 'document.uploaded',
-        entity_type: 'document',
-        entity_id: doc.id,
-        meta: { filename: file.name },
-      });
-      // Attende l'estrazione AI prima di rispondere
-      await processDocument(doc.id);
-    }
-
-    revalidatePath('/documents');
-    revalidatePath('/overview');
-    return { success: true };
-  } catch (e) {
-    console.error('uploadDocument error:', e);
-    return { error: e instanceof Error ? e.message : 'Errore durante il caricamento. Riprova.' };
-  }
+/**
+ * Verifica che il cliente appartenga allo studio. Le scritture qui usano la chiave
+ * di amministratore (che ignora le policy RLS), quindi il controllo va fatto nel codice.
+ */
+async function clientBelongsToFirm(
+  admin: ReturnType<typeof createServiceRoleClient>,
+  clientId: string,
+  firmId: string
+): Promise<boolean> {
+  const { data } = await admin
+    .from('clients')
+    .select('id')
+    .eq('id', clientId)
+    .eq('firm_id', firmId)
+    .maybeSingle();
+  return !!data;
 }
 
 /** Prepara l'upload: crea il record e restituisce path per upload diretto browser → Storage (evita timeout server). */
@@ -112,10 +67,14 @@ export async function prepareDocumentUpload(clientId: string | null, filename: s
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { error: 'Non autenticato' };
 
-    const docId = crypto.randomUUID();
-    const storagePath = `firm/${firmId}/client/${clientId || 'none'}/${docId}-${filename}`;
-
     const admin = createServiceRoleClient();
+    if (clientId && !(await clientBelongsToFirm(admin, clientId, firmId))) {
+      return { error: 'Cliente non trovato' };
+    }
+
+    const docId = crypto.randomUUID();
+    const storagePath = `firm/${firmId}/client/${clientId || 'none'}/${docId}-${sanitizeFilename(filename)}`;
+
     const { error: insertError } = await admin.from('documents').insert({
       firm_id: firmId,
       client_id: clientId || null,
@@ -157,8 +116,30 @@ export async function prepareDocumentUpload(clientId: string | null, filename: s
 /** Dopo upload da browser a Storage: aggiorna mime_type e avvia estrazione AI. */
 export async function confirmDocumentUpload(documentId: string, mimeType: string) {
   try {
+    const supabase = await createClient();
+    const firmId = await requireFirm();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: 'Non autenticato' };
+
     const admin = createServiceRoleClient();
-    await admin.from('documents').update({ mime_type: mimeType }).eq('id', documentId);
+    // Solo documenti dello studio dell'utente, e solo se non ancora elaborati:
+    // evita di far ripartire (e pagare) l'estrazione AI su documenti altrui o già processati.
+    const { data: doc } = await admin
+      .from('documents')
+      .select('id, filename')
+      .eq('id', documentId)
+      .eq('firm_id', firmId)
+      .eq('status', 'uploaded')
+      .maybeSingle();
+    if (!doc) return { error: 'Documento non trovato o già elaborato' };
+
+    const resolvedMime = mimeType || mimeFromFilename(doc.filename ?? '') || '';
+    if (!isAllowedMimeType(resolvedMime)) {
+      await admin.from('documents').update({ status: 'failed' }).eq('id', documentId);
+      return { error: 'Tipo di file non supportato (accettati PDF, JPEG, PNG, WebP)' };
+    }
+
+    await admin.from('documents').update({ mime_type: resolvedMime }).eq('id', documentId);
     // Attende l'estrazione AI prima di rispondere
     await processDocument(documentId);
     revalidatePath('/documents');
@@ -241,9 +222,7 @@ export async function updateDocumentFields(
 
 function generateUploadToken(): string {
   const bytes = new Uint8Array(24);
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    crypto.getRandomValues(bytes);
-  }
+  crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
@@ -331,6 +310,36 @@ export async function ensureClientUploadToken(clientId: string) {
   if (error) return { error: error.message };
   revalidatePath(`/clients/${clientId}`);
   revalidatePath('/clients');
+  return { uploadToken };
+}
+
+/** Genera un nuovo link di caricamento: il vecchio smette subito di funzionare. */
+export async function regenerateClientUploadToken(clientId: string) {
+  const supabase = await createClient();
+  const firmId = await requireFirm();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: 'Non autenticato' };
+
+  const admin = createServiceRoleClient();
+  const uploadToken = generateUploadToken();
+  const { data, error } = await admin
+    .from('clients')
+    .update({ upload_token: uploadToken })
+    .eq('id', clientId)
+    .eq('firm_id', firmId)
+    .select('id')
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!data) return { error: 'Cliente non trovato' };
+
+  await admin.from('audit_logs').insert({
+    firm_id: firmId,
+    user_id: user.id,
+    action: 'client.upload_link_regenerated',
+    entity_type: 'client',
+    entity_id: clientId,
+  });
+  revalidatePath(`/clients/${clientId}`);
   return { uploadToken };
 }
 

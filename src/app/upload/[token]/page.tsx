@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { FileUp, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MAX_PUBLIC_UPLOAD_BYTES } from '@/lib/upload-security';
 
 export default function UploadLinkPage() {
   const params = useParams();
@@ -35,6 +36,16 @@ export default function UploadLinkPage() {
       .catch(() => setInvalid(true))
       .finally(() => setLoading(false));
   }, [token]);
+
+  function pickFile(f: File | null) {
+    setError(null);
+    if (f && f.size > MAX_PUBLIC_UPLOAD_BYTES) {
+      setFile(null);
+      setError('Il file supera i 4 MB. Riduci la foto o dividi il PDF e riprova.');
+      return;
+    }
+    setFile(f);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -123,21 +134,21 @@ export default function UploadLinkPage() {
                 e.preventDefault();
                 setDragOver(false);
                 const f = e.dataTransfer.files?.[0];
-                if (f && (f.type === 'application/pdf' || f.type.startsWith('image/'))) setFile(f);
+                if (f && (f.type === 'application/pdf' || f.type.startsWith('image/'))) pickFile(f);
               }}
             >
               <input
                 type="file"
-                accept=".pdf,image/*"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
                 className="hidden"
                 id="file"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => pickFile(e.target.files?.[0] ?? null)}
               />
               <FileUp className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm font-medium text-foreground">
                 {file ? file.name : 'Trascina qui il file o clicca per scegliere'}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPEG fino a 10 MB</p>
+              <p className="text-xs text-muted-foreground mt-1">PDF, JPEG, PNG o WebP fino a 4 MB</p>
               <Button
                 type="button"
                 variant="outline"

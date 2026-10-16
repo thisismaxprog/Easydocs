@@ -1,28 +1,7 @@
 import OpenAI from 'openai';
-import { extractionJsonSchema, type ExtractionJson } from '@/lib/extraction-schema';
+import { parseExtraction, type ExtractionJson } from '@/lib/extraction-schema';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
-function normalizeReceiptCentsToEur(extracted: ExtractionJson): ExtractionJson {
-  // Heuristic: some receipts come back as "6900" meaning 69,00.
-  // Apply only to receipts and only when it looks like cents.
-  if (extracted.doc_type !== 'receipt') return extracted;
-
-  const normalize = (n: number | null) => {
-    if (n == null) return n;
-    if (!Number.isFinite(n)) return n;
-    // If it's an integer like 6900, 12300, etc. and divisible by 100, treat as cents.
-    if (Number.isInteger(n) && n >= 1000 && n % 100 === 0) return n / 100;
-    return n;
-  };
-
-  return {
-    ...extracted,
-    net_amount: normalize(extracted.net_amount),
-    vat_amount: normalize(extracted.vat_amount),
-    total_amount: normalize(extracted.total_amount),
-  };
-}
 
 const SYSTEM_PROMPT = `Sei un assistente che estrae dati da documenti contabili italiani: FATTURE e SCONTRINI.
 Rispondi SOLO con un JSON valido, senza markdown né testo aggiuntivo.
@@ -74,14 +53,7 @@ export async function extractFromText(text: string): Promise<{
   });
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    parsed = { confidence: 0, doc_type: null, vendor_name: null, vendor_vat: null, doc_number: null, doc_date: null, net_amount: null, vat_amount: null, total_amount: null, currency: null, notes: null };
-  }
-
-  const data = normalizeReceiptCentsToEur(extractionJsonSchema.parse(parsed) as ExtractionJson);
+  const data = parseExtraction(raw);
   return { data, raw };
 }
 
@@ -118,13 +90,6 @@ export async function extractFromImage(
   });
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    parsed = { confidence: 0, doc_type: null, vendor_name: null, vendor_vat: null, doc_number: null, doc_date: null, net_amount: null, vat_amount: null, total_amount: null, currency: null, notes: null };
-  }
-
-  const data = normalizeReceiptCentsToEur(extractionJsonSchema.parse(parsed) as ExtractionJson);
+  const data = parseExtraction(raw);
   return { data, raw };
 }

@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import { AppShell } from '@/components/app-shell';
 import { getCurrentFirmId } from '@/lib/get-firm-id';
 
+// Le server action di upload attendono l'estrazione AI: lascia tempo sufficiente su Vercel.
+export const maxDuration = 60;
+
 export default async function DashboardLayout({
   children,
 }: {

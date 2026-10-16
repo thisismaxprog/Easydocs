@@ -26,6 +26,7 @@ MVP production-grade per studi commercialisti: gestione clienti, upload document
    - `supabase/schema.sql` (tabelle, indici, trigger)
    - `supabase/rls.sql` (policy RLS)
    - `supabase/migrations/001_upgrade_saas.sql` (estensione clienti, documenti, inviti, ruoli)
+   - `supabase/migrations/002_security_fixes.sql` (correzioni di sicurezza)
 3. **Storage**: crea un bucket chiamato `documents` (privato).  
    Opzionale: esegui `supabase/storage.sql` per creare il bucket e le policy via SQL (alcuni progetti potrebbero richiedere di creare il bucket da Dashboard e poi solo le policy da SQL).
 4. In **Authentication > Providers** abilita Email (e opzionalmente Magic Link).
@@ -75,9 +76,10 @@ Apri [http://localhost:3000](http://localhost:3000). Dopo la registrazione verra
 Ogni cliente ha un **link di caricamento** univoco (`/upload/[token]`):
 
 1. Dalla scheda **Cliente** (Dashboard → Clienti → clic su un cliente) viene mostrato il link e il pulsante **Copia link**.
-2. Il cliente apre il link (senza login): vede il nome dello studio/cliente e un’area drag & drop per caricare file (PDF, immagini).
+2. Il cliente apre il link (senza login): vede il nome dello studio/cliente e un’area drag & drop per caricare file (PDF, JPEG, PNG, WebP fino a 4 MB). Massimo 20 file all’ora e 100 al giorno per link.
 3. I documenti caricati tramite questo link vengono associati automaticamente a quel cliente (`source_type = upload_link`, `client_id` impostato).
 4. L’API pubblica `GET/POST /api/upload-link` gestisce la validazione del token e l’upload (service role per scrivere su Storage e su `documents`).
+5. Se il link finisce nelle mani sbagliate, dalla scheda cliente **Rigenera link** lo disattiva e ne crea uno nuovo.
 
 ## Assegnazione documenti
 

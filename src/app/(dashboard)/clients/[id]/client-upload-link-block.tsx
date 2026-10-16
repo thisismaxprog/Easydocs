@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Copy, Loader2, Check } from 'lucide-react';
+import { Copy, Loader2, Check, RefreshCw } from 'lucide-react';
 import { useAppToast } from '@/hooks/use-app-toast';
-import { ensureClientUploadToken } from '@/app/actions';
+import { ensureClientUploadToken, regenerateClientUploadToken } from '@/app/actions';
 
 export function ClientUploadLinkBlockClient({
   clientId,
@@ -16,7 +16,9 @@ export function ClientUploadLinkBlockClient({
   const [token, setToken] = useState<string | null>(initialToken);
   const [loading, setLoading] = useState(!initialToken);
   const [copied, setCopied] = useState(false);
-  const { success } = useAppToast();
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const { success, error } = useAppToast();
 
   useEffect(() => {
     if (initialToken) return;
@@ -39,6 +41,23 @@ export function ClientUploadLinkBlockClient({
       success('Link copiato', 'Il link di caricamento è stato copiato negli appunti.');
       setTimeout(() => setCopied(false), 2000);
     });
+  }
+
+  async function handleRegenerate() {
+    if (!confirmRegenerate) {
+      setConfirmRegenerate(true);
+      return;
+    }
+    setRegenerating(true);
+    const res = await regenerateClientUploadToken(clientId);
+    setRegenerating(false);
+    setConfirmRegenerate(false);
+    if (res.uploadToken) {
+      setToken(res.uploadToken);
+      success('Nuovo link generato', 'Il link precedente non funziona più. Invia al cliente quello nuovo.');
+    } else {
+      error('Errore', res.error ?? 'Impossibile rigenerare il link.');
+    }
   }
 
   if (loading) {
@@ -72,6 +91,29 @@ export function ClientUploadLinkBlockClient({
         )}
         {copied ? 'Copiato' : 'Copia link'}
       </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={confirmRegenerate ? 'destructive' : 'ghost'}
+          size="sm"
+          onClick={handleRegenerate}
+          disabled={regenerating}
+        >
+          {regenerating ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <RefreshCw className="mr-2 h-4 w-4" />
+          )}
+          {confirmRegenerate ? 'Conferma: disattiva il link attuale' : 'Rigenera link'}
+        </Button>
+        {confirmRegenerate && !regenerating && (
+          <Button variant="ghost" size="sm" onClick={() => setConfirmRegenerate(false)}>
+            Annulla
+          </Button>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Rigenera il link se l&apos;hai inviato alla persona sbagliata o non vuoi più ricevere file da questo indirizzo.
+      </p>
     </div>
   );
 }

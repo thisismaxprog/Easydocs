@@ -49,10 +49,8 @@ create policy "Owners can delete firm members"
   on public.firm_members for delete
   using (firm_id in (select user_firm_ids()) and exists (select 1 from public.firm_members fm where fm.firm_id = firm_members.firm_id and fm.user_id = auth.uid() and fm.role = 'owner'));
 
--- Allow user to insert themselves as first member (onboarding)
-create policy "Users can insert self as firm member"
-  on public.firm_members for insert
-  with check (user_id = auth.uid());
+-- Nota: NON aggiungere una policy che permetta all'utente di inserire se stesso come membro.
+-- Permetterebbe di entrare in qualsiasi studio. Il primo membro (owner) lo crea createFirm lato server.
 
 -- Clients: CRUD only for own firm
 create policy "Users can read clients of own firms"
